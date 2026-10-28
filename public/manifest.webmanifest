@@ -1,0 +1,10 @@
+{
+  "name": "ТОЧКА — чат сотрудников",
+  "short_name": "ТОЧКА",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0e1625",
+  "theme_color": "#0e1625",
+  "description": "Мессенджер сотрудников пунктов выдачи"
+}
