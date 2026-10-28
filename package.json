@@ -5,5 +5,11 @@
   "type": "module",
   "dependencies": {
     "@portable/web-push": "*"
+  },
+  "scripts": {
+    "postinstall": "node scripts/bundle-push.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }
