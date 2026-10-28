@@ -1,4 +1,4 @@
-import * as WebPush from '@portable/web-push';
+import { buildPushHTTPRequest } from '@pushforge/builder';
 const BASE='https://tmumiyekzgafawxdwgxm.supabase.co';
 const pub='sb_publishable_xrQK9pXy3KTvazSmbHScGg_QvHyScNw';
 async function api(path,token,method='GET',data){const r=await fetch(BASE+path,{method,headers:{apikey:token?'':pub,authorization:'Bearer '+token,'content-type':'application/json',prefer:'return=representation'},body:data?JSON.stringify(data):undefined});if(!r.ok)throw Error('Supabase '+r.status);return r.json()}
@@ -24,7 +24,7 @@ const claimed=await fetch(BASE+'/rest/v1/push_dispatches',{method:'POST',headers
 if(!claimed.ok)return Response.json({status:'already_processed'});
 const targets=[];
 for(const id of ids.slice(0,100)){const rows=await admin('/rest/v1/push_subscriptions?user_id=eq.'+id+'&select=endpoint,p256dh,auth_secret',env);targets.push(...rows)}
-context.waitUntil(Promise.allSettled(targets.slice(0,200).map(async sub=>{try{const result=await WebPush.send({subscription:{endpoint:sub.endpoint,keys:{p256dh:sub.p256dh,auth:sub.auth_secret}},payload:JSON.stringify({title:'ТОЧКА · Новое сообщение',body:'Вам пришло новое сообщение',url:'/'}),vapid:{subject:env.VAPID_SUBJECT,publicKey:env.VAPID_PUBLIC_KEY,privateKey:env.VAPID_PRIVATE_KEY},ttl:86400});if(result.kind==='gone')await admin('/rest/v1/push_subscriptions?endpoint=eq.'+encodeURIComponent(sub.endpoint),env,'DELETE')}catch(e){console.error('push',e.message)}})));
+context.waitUntil(Promise.allSettled(targets.slice(0,200).map(async sub=>{try{const raw=Uint8Array.from(atob(env.VAPID_PUBLIC_KEY.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));if(raw.length!==65||raw[0]!==4)throw Error('Invalid VAPID public key');const b64=b=>btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');const privateJWK={kty:'EC',crv:'P-256',x:b64(raw.slice(1,33)),y:b64(raw.slice(33,65)),d:env.VAPID_PRIVATE_KEY};const req=await buildPushHTTPRequest({privateJWK,subscription:{endpoint:sub.endpoint,keys:{p256dh:sub.p256dh,auth:sub.auth_secret}},message:{payload:{title:'ТОЧКА · Новое сообщение',body:'Вам пришло новое сообщение',url:'/'},adminContact:env.VAPID_SUBJECT,options:{ttl:86400}}});const resp=await fetch(req.endpoint,{method:'POST',headers:req.headers,body:req.body});if(resp.status===404||resp.status===410)await admin('/rest/v1/push_subscriptions?endpoint=eq.'+encodeURIComponent(sub.endpoint),env,'DELETE');else if(!resp.ok)throw Error('Push service '+resp.status)}catch(e){console.error('push',e.message)}})));
 return Response.json({status:'queued',devices:targets.length});
 }catch(e){console.error(e);return Response.json({error:'Push unavailable'},{status:500})}
 }
