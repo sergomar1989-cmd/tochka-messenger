@@ -28,15 +28,19 @@ async function enablePush(requestConsent=true){
  localStorage.removeItem('tochka_push_off');await updatePushButton();
 }
 async function togglePush(){
- if(pushBusy)return;pushBusy=true;const btn=$('notify');btn.disabled=true;
+ if(pushBusy)return;pushBusy=true;
+ const permissionPromise=('Notification' in window&&Notification.permission==='default')?Notification.requestPermission():null;
+ const btn=$('notify');btn.disabled=true;
  const label=btn.querySelector('.bell-label');if(label)label.textContent='Проверяю…';
  try{
+  const permissionResult=permissionPromise?await permissionPromise:null;
   const sub=await pushSubscription();
   if(sub&&localStorage.getItem('tochka_push_off')!=='1'){
    await get(db.from('push_subscriptions').delete().eq('endpoint',sub.endpoint).eq('user_id',me.id));
    await sub.unsubscribe();localStorage.setItem('tochka_push_off','1');message('Уведомления отключены');
   }else{
-   await enablePush(true);message('Уведомления включены');
+   if(permissionResult&&permissionResult!=='granted')throw Error('Разрешение на уведомления не предоставлено');
+   await enablePush(false);message('Уведомления включены');
   }
  }catch(e){message('Ошибка уведомлений: '+(e.message||String(e)))}
  finally{pushBusy=false;btn.disabled=false;await updatePushButton()}
